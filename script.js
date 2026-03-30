@@ -3,7 +3,9 @@ const BLACK_MARKET = "Black Market";
 const ITEM_SEARCH_BASE_URL = "https://www.albion-online-data.com/items";
 const MARKET_API_BASE_URL = `https://${SERVER}.albion-online-data.com/api/v2/stats/prices`;
 const MARKET_HISTORY_API_BASE_URL = `https://${SERVER}.albion-online-data.com/api/v2/stats/history`;
-const ITEM_SCAN_BATCH_SIZE = 10;
+const ITEM_SCAN_BATCH_SIZE = 60;
+const ITEM_CACHE_KEY = "albion_item_catalog";
+const TIER_FETCH_CONCURRENCY = 4;
 const TOP_SCAN_RESULTS = 15;
 const SCAN_TIERS = ["T2", "T3", "T4", "T5", "T6", "T7", "T8"];
 const SCAN_QUALITIES = ["1", "2", "3"];
@@ -201,80 +203,122 @@ function isArtifactName(name) {
   return ARTIFACT_NAME_KEYWORDS.some((keyword) => normalized.includes(keyword));
 }
 
-async function fetchTierItems() {
+function loadCachedItems() {
+  try {
+    const raw = localStorage.getItem(ITEM_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (Array.isArray(cached) && cached.length > 0) return cached;
+  } catch { /* ignore corrupt cache */ }
+  return null;
+}
+
+function saveCachedItems(items) {
+  try {
+    localStorage.setItem(ITEM_CACHE_KEY, JSON.stringify(items));
+  } catch { /* ignore quota errors */ }
+}
+
+function clearCachedItems() {
+  localStorage.removeItem(ITEM_CACHE_KEY);
+}
+
+async function runWithConcurrency(tasks, concurrency) {
   const results = [];
-  const seen = new Set();
+  let index = 0;
 
-  for (const tier of SCAN_TIERS) {
-    const parser = new DOMParser();
-    const tierQueries = [
-      tier,
-      ...WEAPON_SEARCH_TERMS,
-      ...WEAPON_SEARCH_TERMS.map((term) => `${tier} ${term}`),
-      ...WEAPON_SEARCH_TERMS.map((term) => `${term} ${tier}`),
-    ];
-    const pendingUrls = tierQueries.map((query) => `${ITEM_SEARCH_BASE_URL}?q=${encodeURIComponent(query)}&lang=EN-US`);
-    const visitedUrls = new Set();
-
-    while (pendingUrls.length > 0) {
-      const url = pendingUrls.shift();
-
-      if (!url || visitedUrls.has(url)) {
-        continue;
-      }
-
-      visitedUrls.add(url);
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Tier item search failed: ${response.status}`);
-      }
-
-      const htmlText = await response.text();
-      const doc = parser.parseFromString(htmlText, "text/html");
-      const rows = Array.from(doc.querySelectorAll(".items-table tbody tr"));
-
-      rows.forEach((row) => {
-        const rawItemId = row.querySelector(".items-table__unique code")?.textContent?.trim();
-        const name = row.querySelector(".items-table__name")?.textContent?.trim();
-
-        if (!rawItemId || !name) {
-          return;
-        }
-
-        const baseItemId = normalizeBaseItemId(rawItemId);
-
-        if (!baseItemId.startsWith(tier)) {
-          return;
-        }
-
-        if (isArtifactItem(baseItemId) || isArtifactName(name)) {
-          return;
-        }
-
-        if (seen.has(baseItemId)) {
-          return;
-        }
-
-        seen.add(baseItemId);
-        results.push({ itemId: baseItemId, name });
-      });
-
-      const paginationLinks = Array.from(doc.querySelectorAll('a[href]'))
-        .map((link) => link.getAttribute("href"))
-        .filter((href) => typeof href === "string" && href.includes("/items"))
-        .map((href) => new URL(href, ITEM_SEARCH_BASE_URL).toString());
-
-      paginationLinks.forEach((paginationUrl) => {
-        if (!visitedUrls.has(paginationUrl)) {
-          pendingUrls.push(paginationUrl);
-        }
-      });
+  async function worker() {
+    while (index < tasks.length) {
+      const currentIndex = index++;
+      results[currentIndex] = await tasks[currentIndex]();
     }
   }
 
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker());
+  await Promise.all(workers);
   return results;
+}
+
+async function fetchTierItemsForTier(tier, seen, statusCallback) {
+  const results = [];
+  const parser = new DOMParser();
+  const tierQueries = [
+    tier,
+    ...WEAPON_SEARCH_TERMS.map((term) => `${tier} ${term}`),
+  ];
+  const pendingUrls = tierQueries.map((query) => `${ITEM_SEARCH_BASE_URL}?q=${encodeURIComponent(query)}&lang=EN-US`);
+  const visitedUrls = new Set();
+
+  const fetchTasks = [];
+
+  function parseResponse(htmlText, targetTier) {
+    const doc = parser.parseFromString(htmlText, "text/html");
+    const rows = Array.from(doc.querySelectorAll(".items-table tbody tr"));
+
+    rows.forEach((row) => {
+      const rawItemId = row.querySelector(".items-table__unique code")?.textContent?.trim();
+      const name = row.querySelector(".items-table__name")?.textContent?.trim();
+
+      if (!rawItemId || !name) return;
+
+      const baseItemId = normalizeBaseItemId(rawItemId);
+      if (!baseItemId.startsWith(targetTier)) return;
+      if (isArtifactItem(baseItemId) || isArtifactName(name)) return;
+      if (seen.has(baseItemId)) return;
+
+      seen.add(baseItemId);
+      results.push({ itemId: baseItemId, name });
+    });
+
+    const paginationLinks = Array.from(doc.querySelectorAll('a[href]'))
+      .map((link) => link.getAttribute("href"))
+      .filter((href) => typeof href === "string" && href.includes("/items"))
+      .map((href) => new URL(href, ITEM_SEARCH_BASE_URL).toString());
+
+    paginationLinks.forEach((paginationUrl) => {
+      if (!visitedUrls.has(paginationUrl)) {
+        visitedUrls.add(paginationUrl);
+        pendingUrls.push(paginationUrl);
+      }
+    });
+  }
+
+  // Phase 1: fetch initial queries with concurrency
+  const initialTasks = pendingUrls.map((url) => {
+    visitedUrls.add(url);
+    return async () => {
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const htmlText = await response.text();
+      parseResponse(htmlText, tier);
+    };
+  });
+  pendingUrls.length = 0;
+
+  await runWithConcurrency(initialTasks, TIER_FETCH_CONCURRENCY);
+
+  // Phase 2: follow pagination links (discovered during phase 1)
+  while (pendingUrls.length > 0) {
+    const batch = pendingUrls.splice(0, TIER_FETCH_CONCURRENCY);
+    const pageTasks = batch.map((url) => async () => {
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const htmlText = await response.text();
+      parseResponse(htmlText, tier);
+    });
+    await runWithConcurrency(pageTasks, TIER_FETCH_CONCURRENCY);
+  }
+
+  if (statusCallback) statusCallback(tier);
+  return results;
+}
+
+async function fetchTierItems(statusCallback) {
+  const seen = new Set();
+  const tierResults = await Promise.all(
+    SCAN_TIERS.map((tier) => fetchTierItemsForTier(tier, seen, statusCallback))
+  );
+  return tierResults.flat();
 }
 
 async function fetchPriceBatchForQuality(itemIds, quality) {
@@ -558,7 +602,7 @@ function sortResults(results) {
     });
 }
 
-async function scanBestProfits() {
+async function scanBestProfits(forceRefreshItems = false) {
   const currentRunId = ++scanRunId;
   const sellTax = Math.max(0, Number.parseFloat(fields.sellTax.value) || 0);
   const taxMultiplier = 1 - sellTax / 100;
@@ -571,7 +615,20 @@ async function scanBestProfits() {
   renderScanResults([], "Scanning items...");
 
   try {
-    const baseItems = await fetchTierItems();
+    let baseItems = forceRefreshItems ? null : loadCachedItems();
+
+    if (baseItems) {
+      output.status.textContent = `Loaded ${baseItems.length} items from cache. Fetching prices...`;
+    } else {
+      let tiersCompleted = 0;
+      output.status.textContent = "Fetching item catalog (0/7 tiers)...";
+      baseItems = await fetchTierItems((tier) => {
+        tiersCompleted += 1;
+        output.status.textContent = `Fetching item catalog (${tiersCompleted}/7 tiers)...`;
+      });
+      saveCachedItems(baseItems);
+      output.status.textContent = `Found ${baseItems.length} items. Fetching prices...`;
+    }
 
     if (currentRunId !== scanRunId) {
       return;
@@ -679,10 +736,10 @@ async function scanBestProfits() {
 
       completedSteps += 1;
 
-      output.scanStatus.textContent = `Scanning ${completedSteps} / ${totalSteps} batches...`;
+      output.scanStatus.textContent = `Fetching prices: ${completedSteps} / ${totalSteps} batches...`;
+      output.status.textContent = `Fetching prices: ${completedSteps} / ${totalSteps}`;
       allScanResults = sortResults(allResults);
       renderScanResults(getVisibleScanResults(), "Scanning items...");
-      await delay(80);
     }
 
     if (currentRunId !== scanRunId) {
@@ -710,7 +767,13 @@ async function scanBestProfits() {
   }
 }
 
-scanButton.addEventListener("click", scanBestProfits);
+const refreshItemsButton = document.getElementById("refresh-items-button");
+
+scanButton.addEventListener("click", () => scanBestProfits(false));
+refreshItemsButton.addEventListener("click", () => {
+  clearCachedItems();
+  output.status.textContent = "Item cache cleared. Next scan will re-fetch items.";
+});
 prevPageButton.addEventListener("click", () => {
   if (currentPage > 1) {
     currentPage -= 1;

@@ -301,6 +301,31 @@ input[type="hidden"] {
   color: var(--muted);
 }
 
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.refresh-button {
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 214, 145, 0.18);
+  background: rgba(255, 248, 236, 0.06);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.refresh-button:hover {
+  background: rgba(255, 248, 236, 0.14);
+  color: var(--text);
+}
+
 .results-grid {
   margin-top: 24px;
   display: grid;
