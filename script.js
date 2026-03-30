@@ -213,7 +213,7 @@ function parseOpenAlbionItems(apiItems) {
 }
 
 async function fetchItemCatalog(statusCallback) {
-  const endpoints = ["weapons", "armors", "accessories"];
+  const endpoints = ["weapons", "armors"];
   const allItems = [];
 
   const responses = await Promise.all(
