@@ -1,0 +1,42 @@
+Albion Online Weight Calculation Guide
+
+How we calculate item weight:
+
+1. Each tier has a fixed material weight:
+Tier 4 = 0.2125
+Tier 5 = 0.3125
+Tier 6 = 0.475
+Tier 7 = 0.7125
+Tier 8 = 1.06875
+
+2. Each item type uses a fixed number of materials:
+Chest armor / jacket / robe / bag / satchel = 16 materials
+Head armor = 8 materials
+Shoes = 8 materials
+Off-hand / shield = 8 materials
+One-hand weapon = 24 materials
+Two-hand weapon = 32 materials
+Cape = 8 materials
+
+3. Formula:
+Item Weight = Material Weight by Tier x Number of Required Materials
+
+Examples:
+
+Tier 8 chest armor:
+16 x 1.06875 = 17.1
+
+Tier 7 head armor:
+8 x 0.7125 = 5.7
+
+Tier 6 off-hand:
+8 x 0.475 = 3.8
+
+Tier 8 one-hand weapon:
+24 x 1.06875 = 25.65
+
+Tier 8 two-hand weapon:
+32 x 1.06875 = 34.2
+
+If you want total cargo weight:
+Total Weight = Item Weight x Quantity

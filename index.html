@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Albion Online - Black Market Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">Albion Online Data Project Only</p>
+      <h1>Buy by City and Sell to the Black Market</h1>
+      <p class="intro">
+        Pick a buy city and enchantment, then scan the best Black Market sell-order
+        opportunities using Albion Online Data Project only.
+      </p>
+    </section>
+
+    <section class="panel calculator">
+      <form id="lookup-form" class="form-grid">
+        <article class="server-card">
+          <span class="server-label">Server</span>
+          <strong>Europe</strong>
+        </article>
+
+        <label>
+          <span>Buy City</span>
+          <select id="buy-city" name="buyCity">
+            <option value="Bridgewatch">Bridgewatch</option>
+            <option value="Caerleon">Caerleon</option>
+            <option value="Fort Sterling">Fort Sterling</option>
+            <option value="Lymhurst">Lymhurst</option>
+            <option value="Martlock">Martlock</option>
+            <option value="Thetford">Thetford</option>
+            <option value="Brecilien">Brecilien</option>
+          </select>
+        </label>
+
+        <fieldset class="tier-filter">
+          <legend>Tier Filter</legend>
+          <label class="tier-option"><input type="checkbox" name="tierFilter" value="T2"> <span>T2</span></label>
+          <label class="tier-option"><input type="checkbox" name="tierFilter" value="T3"> <span>T3</span></label>
+          <label class="tier-option"><input type="checkbox" name="tierFilter" value="T4"> <span>T4</span></label>
+          <label class="tier-option"><input type="checkbox" name="tierFilter" value="T5"> <span>T5</span></label>
+          <label class="tier-option"><input type="checkbox" name="tierFilter" value="T6"> <span>T6</span></label>
+          <label class="tier-option"><input type="checkbox" name="tierFilter" value="T7"> <span>T7</span></label>
+          <label class="tier-option"><input type="checkbox" name="tierFilter" value="T8"> <span>T8</span></label>
+        </fieldset>
+
+        <fieldset class="tier-filter enchantment-filter">
+          <legend>Enchantment Filter</legend>
+          <label class="tier-option"><input type="checkbox" name="enchantmentFilter" value="0"> <span>0</span></label>
+          <label class="tier-option"><input type="checkbox" name="enchantmentFilter" value="1"> <span>1</span></label>
+          <label class="tier-option"><input type="checkbox" name="enchantmentFilter" value="2" checked> <span>2</span></label>
+          <label class="tier-option"><input type="checkbox" name="enchantmentFilter" value="3"> <span>3</span></label>
+          <label class="tier-option"><input type="checkbox" name="enchantmentFilter" value="4"> <span>4</span></label>
+        </fieldset>
+
+        <label>
+          <span>Sell Tax %</span>
+          <input id="sell-tax" name="sellTax" type="number" min="0" step="0.1" value="4">
+        </label>
+
+        <label>
+          <span>Min Profit / Weight</span>
+          <select id="profit-weight-filter" name="profitWeightFilter">
+            <option value="0">All</option>
+            <option value="10000-20000">10000 to 20000</option>
+            <option value="20000-40000">20000 to 40000</option>
+            <option value="40000-plus">40000+</option>
+          </select>
+        </label>
+
+        <div class="actions wide">
+          <button id="scan-button" type="button" class="secondary-button">Find Best Sell Orders</button>
+          <p id="status-text" class="status">Ready.</p>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel summary">
+      <div class="summary-header">
+        <h2>Best Sell-Order Items</h2>
+        <label class="sort-control">
+          <span class="sort-label"><span class="sort-icon" aria-hidden="true">⇅</span> Sort Results By</span>
+          <select id="sort-by" name="sortBy">
+            <option value="profitPerWeight">Profit / Weight</option>
+            <option value="profitPerUnit">Profit / Unit</option>
+            <option value="blackMarketSevenDayAverage">BM 7d Avg</option>
+            <option value="cityBuyPrice">Buy Price</option>
+            <option value="sellTax">Sell Tax</option>
+            <option value="recommendedQuantity">Recommended Qty</option>
+            <option value="totalEstimatedWeight">Est. Total Weight</option>
+          </select>
+        </label>
+      </div>
+      <div class="scan-meta">
+        <p id="scan-status">Choose a city, tier, and enchantment, then click Find Best Sell Orders.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Item</th>
+              <th>Buy Price</th>
+              <th>BM 7d Avg</th>
+              <th>Sell Tax</th>
+              <th>Profit / Unit</th>
+              <th>Profit / Weight</th>
+              <th>Recommended Qty</th>
+              <th>Est. Total Weight</th>
+            </tr>
+          </thead>
+          <tbody id="scan-results-body">
+            <tr>
+              <td colspan="9">No scan yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button id="prev-page-button" type="button" class="secondary-button">Previous</button>
+        <p id="page-status" class="status">Page 1 of 1</p>
+        <button id="next-page-button" type="button" class="secondary-button">Next</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
