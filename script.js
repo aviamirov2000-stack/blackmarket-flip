@@ -244,6 +244,7 @@ async function fetchTierItemsForTier(tier, seen, statusCallback) {
   const parser = new DOMParser();
   const tierQueries = [
     tier,
+    ...WEAPON_SEARCH_TERMS,
     ...WEAPON_SEARCH_TERMS.map((term) => `${tier} ${term}`),
   ];
   const pendingUrls = tierQueries.map((query) => `${ITEM_SEARCH_BASE_URL}?q=${encodeURIComponent(query)}&lang=EN-US`);
