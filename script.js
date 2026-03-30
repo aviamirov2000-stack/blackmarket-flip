@@ -203,6 +203,11 @@ function parseOpenAlbionItems(apiItems) {
 
     if (!tier || tier < 2 || tier > 8) return;
     if (isArtifactItem(baseItemId)) return;
+
+    const isCapeOrBag = baseItemId.includes("CAPE") || baseItemId.includes("BAG");
+    const isWeaponOrArmor = baseItemId.includes("_MAIN_") || baseItemId.includes("_2H_") || baseItemId.includes("_OFF_")
+      || baseItemId.includes("_ARMOR_") || baseItemId.includes("_HEAD_") || baseItemId.includes("_SHOES_");
+    if (!isCapeOrBag && !isWeaponOrArmor) return;
     if (seen.has(baseItemId)) return;
 
     seen.add(baseItemId);
@@ -213,7 +218,7 @@ function parseOpenAlbionItems(apiItems) {
 }
 
 async function fetchItemCatalog(statusCallback) {
-  const endpoints = ["weapons", "armors"];
+  const endpoints = ["weapons", "armors", "accessories"];
   const allItems = [];
 
   const responses = await Promise.all(
